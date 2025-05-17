@@ -1,8 +1,13 @@
+import random
+
 import pygame
 import enum
 import time
 
 BG = (0, 25, 40)
+WIDTH, HEIGHT = 100, 100
+WIN = pygame.display.set_mode((WIDTH,HEIGHT))
+pygame.display.set_caption("Snake")
 
 
 class Direction(enum.Enum):
@@ -16,7 +21,7 @@ class Snake:
 
     def __init__(self, x, y):
         self.body = [[x, y], [x - 1, y - 1], [x - 2, y - 2]]
-        self.direction = Direction.DOWN
+        self.direction = Direction.RIGHT
 
     def move(self, new_direction: Direction):
         body = self.body
@@ -72,22 +77,47 @@ class Snake:
     def get_direction(self):
         return self.direction
 
+    def append_tail(self):
+        current_tail_x, current_tail_y = self.body[-1]
+        new_tail_x, new_tail_y = current_tail_x + 1, current_tail_y + 1
+
+        if 0 <= new_tail_x <= WIDTH and 0 <= new_tail_y <= HEIGHT:
+            self.body.append([new_tail_x, new_tail_y])
+        else:
+            print('Tail is out of the box')
+
 
 class Fruit:
+    INTERVAL_SEC = 10
 
     def __init__(self, x, y, lifespan):
         self.x = x
         self.y = y
-        self.lifespan = lifespan
+        self.lifespan = lifespan + self.INTERVAL_SEC
 
-    def set_position(self):
-        pass
+    def set_position(self, x=None, y=None):
+        if x is None or y is None:
+            x, y = self._generate_random_position()
+
+        if 0 <= x <= WIDTH and 0 <= y <= HEIGHT:
+            self.x = x
+            self.y = y
+        else:
+            print('Invalid position.')
+
+    def remove_position(self):
+        self.x, self.y = None, None
 
     def get_position(self):
-        pass
+        return [self.x, self.y]
 
     def update_lifespan(self):
-        pass
+        current_timestamp = time.time()
+        self.lifespan = current_timestamp + self.INTERVAL_SEC
+
+    @staticmethod
+    def _generate_random_position():
+        return [random.randrange(0, WIDTH), random.randrange(0, HEIGHT)]
 
 
 class Gameboard:
@@ -95,14 +125,32 @@ class Gameboard:
 
 
 def main():
-    WIDTH, HEIGHT = 100, 100
-    WIN = pygame.display.set_mode((WIDTH, HEIGHT))
-    pygame.display.set_caption("Snake")
     running = True
 
     snake = Snake(50, 50)
+    fruit = Fruit(55, 50, time.time())
+    score = 0
+    fruit.update_lifespan()
 
     while running:
+        fruit_position = fruit.get_position()
+
+        if time.time() > fruit.lifespan:
+            fruit.remove_position()
+            fruit.update_lifespan()
+            fruit.set_position()
+            fruit_position = fruit.get_position()
+
+        snake_head = snake.body[0]
+
+        if snake_head == fruit_position:
+            score += 1
+            snake.append_tail()
+            fruit.remove_position()
+            fruit.update_lifespan()
+            fruit.set_position()
+            fruit_position = fruit.get_position()
+
         snake.move(snake.direction)
         for event in pygame.event.get():
 
@@ -118,6 +166,11 @@ def main():
                     snake.set_direction(Direction.DOWN)
                 elif event.key == pygame.K_UP:
                     snake.set_direction(Direction.UP)
+
+        print(f'Snake: {snake.body}')
+        print(f'Fruit: {fruit_position}')
+        print(f'Score: {score}')
+
         time.sleep(1)
     pygame.quit()
 
