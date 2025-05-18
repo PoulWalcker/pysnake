@@ -6,9 +6,18 @@ import time
 import curses
 from typing import List
 
-BG = (0, 25, 40)
+BG = (148, 148, 148)
+RED = (224, 43, 40)
+GREEN = (20, 133, 24)
+BLUE = (77, 115, 232)
+BLACK = (0, 0, 0)
+GRAY = (140, 140, 140)
+
 WIDTH, HEIGHT = 400, 400
-ROW, COL = 10, 10
+ROW, COL = 15, 15
+LINE_THICKNESS = 2
+CELL_SIZE = WIDTH // ROW
+
 WIN = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Snake")
 
@@ -163,7 +172,24 @@ class Gameboard:
         ]
 
 
-def main(stdscr):
+def draw_grid(win, color):
+    for x in range(0, WIDTH, CELL_SIZE):
+        pygame.draw.line(win, color, (x, 0), (x, HEIGHT), LINE_THICKNESS)
+    for y in range(0, HEIGHT, CELL_SIZE):
+        pygame.draw.line(win, color, (0, y), (WIDTH, y), LINE_THICKNESS)
+
+
+def draw_pixel(win, color, x, y, width, height):
+    pygame.draw.rect(win, color, (x, y, width, height))
+
+
+def draw_items(win, items, color, width, height):
+    for coordinate in items:
+        x, y = coordinate
+        draw_pixel(win, color, x * width, y * height, width, height)
+
+
+def main(win):
     running = True
     score = 0
 
@@ -173,7 +199,7 @@ def main(stdscr):
     fruit.update_lifespan()
 
     while running:
-        stdscr.clear()
+        win.fill(BG)
         snake_head = snake.body[0]
 
         if time.time() > fruit.lifespan:
@@ -196,7 +222,6 @@ def main(stdscr):
                 running = False
 
             if event.type == pygame.KEYDOWN:
-                print(event.key)
                 if event.key == pygame.K_LEFT:
                     snake.set_direction(Direction.LEFT)
                 elif event.key == pygame.K_RIGHT:
@@ -215,14 +240,16 @@ def main(stdscr):
         gameboard.add_item_on_board(snake.body, CellType.SNAKE)
         gameboard.add_item_on_board([fruit.get_position()], CellType.FRUIT)
 
-        for i, row in enumerate(gameboard.board):
-            stdscr.addstr(i, 0, " ".join(list(map(str, row))))
+        # Draw board
+        draw_grid(win, GRAY)
 
-        ln_board = len(gameboard.board)
+        # Draw snake
+        draw_items(win, snake.body, GREEN, CELL_SIZE, CELL_SIZE)
 
-        stdscr.addstr(ln_board, 0, "Data ---------------")
-        stdscr.addstr(ln_board + 1, 0, f"Score: {score}")
-        stdscr.refresh()
+        # Draw fruit
+        draw_items(win, [[fruit.x, fruit.y]], RED, CELL_SIZE, CELL_SIZE)
+
+        pygame.display.flip()
 
         gameboard.clear_board()
 
@@ -230,4 +257,4 @@ def main(stdscr):
     pygame.quit()
 
 
-curses.wrapper(main)
+main(WIN)
