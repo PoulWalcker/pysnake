@@ -3,10 +3,13 @@ import random
 import pygame
 import enum
 import time
+import curses
+from typing import List
 
 BG = (0, 25, 40)
-WIDTH, HEIGHT = 100, 100
-WIN = pygame.display.set_mode((WIDTH,HEIGHT))
+WIDTH, HEIGHT = 400, 400
+ROW, COL = 10, 10
+WIN = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Snake")
 
 
@@ -17,17 +20,24 @@ class Direction(enum.Enum):
     RIGHT = "RIGHT"
 
 
+class CellType(enum.Enum):
+    EMPTY = 0
+    SNAKE = 1
+    FRUIT = 2
+    OBSTACLE = 3
+
+
 class Snake:
 
     def __init__(self, x, y):
-        self.body = [[x, y], [x - 1, y - 1], [x - 2, y - 2]]
-        self.direction = Direction.RIGHT
+        self.body = [[x, y]]
+        self.direction = Direction.UP
 
     def move(self, new_direction: Direction):
         body = self.body
         current_direction = self.direction
 
-        if current_direction != new_direction:
+        if current_direction not in Direction:
             print("Direction does not exist")
             return
 
@@ -44,13 +54,19 @@ class Snake:
 
         new_head = [head_x, head_y]
 
+        if self._check_collision(new_head):
+            return
+
         if len(body) == 1:
             new_body = [new_head]
             body.clear()  # Do we need clear list? Or garbage collector handle it?!
         else:
-            body.pop()
-            new_body = [new_head, *body[:]]
-
+            # Check collision
+            if new_head in self.body[1:]:
+                return
+            else:
+                body.pop()
+                new_body = [new_head, *body[:]]
 
         self.body = new_body
 
@@ -81,10 +97,15 @@ class Snake:
         current_tail_x, current_tail_y = self.body[-1]
         new_tail_x, new_tail_y = current_tail_x + 1, current_tail_y + 1
 
-        if 0 <= new_tail_x <= WIDTH and 0 <= new_tail_y <= HEIGHT:
+        if 0 <= new_tail_x <= ROW and 0 <= new_tail_y <= COL:
             self.body.append([new_tail_x, new_tail_y])
         else:
-            print('Tail is out of the box')
+            print("Tail is out of the box")
+
+    @staticmethod
+    def _check_collision(next_step):
+        x, y = next_step
+        return x < 0 or x >= ROW or y < 0 or y >= COL
 
 
 class Fruit:
@@ -97,13 +118,14 @@ class Fruit:
 
     def set_position(self, x=None, y=None):
         if x is None or y is None:
+            # ToDo: avoid position which is not EMPTY
             x, y = self._generate_random_position()
 
-        if 0 <= x <= WIDTH and 0 <= y <= HEIGHT:
+        if 0 <= x <= ROW and 0 <= y <= COL:
             self.x = x
             self.y = y
         else:
-            print('Invalid position.')
+            print("Invalid position.")
 
     def remove_position(self):
         self.x, self.y = None, None
@@ -117,47 +139,64 @@ class Fruit:
 
     @staticmethod
     def _generate_random_position():
-        return [random.randrange(0, WIDTH), random.randrange(0, HEIGHT)]
+        return [random.randrange(0, ROW), random.randrange(0, COL)]
 
 
 class Gameboard:
-    pass
+
+    def __init__(self, weight, height):
+        self.weight = weight
+        self.height = height
+        self.board = [
+            [CellType.EMPTY.value for _ in range(weight)] for _ in range(height)
+        ]
+
+    def add_item_on_board(self, item: List, cell_type: CellType):
+        for coordinates in item:
+            col, row = coordinates
+            self.board[row][col] = cell_type.value
+
+    def clear_board(self):
+        self.board = [
+            [CellType.EMPTY.value for _ in range(self.weight)]
+            for _ in range(self.height)
+        ]
 
 
-def main():
+def main(stdscr):
     running = True
-
-    snake = Snake(50, 50)
-    fruit = Fruit(55, 50, time.time())
     score = 0
+
+    snake = Snake(5, 5)
+    fruit = Fruit(5, 1, time.time())
+    gameboard = Gameboard(ROW, COL)
     fruit.update_lifespan()
 
     while running:
-        fruit_position = fruit.get_position()
+        stdscr.clear()
+        snake_head = snake.body[0]
 
         if time.time() > fruit.lifespan:
             fruit.remove_position()
             fruit.update_lifespan()
             fruit.set_position()
-            fruit_position = fruit.get_position()
 
-        snake_head = snake.body[0]
-
-        if snake_head == fruit_position:
+        if snake_head == fruit.get_position():
             score += 1
-            snake.append_tail()
+
             fruit.remove_position()
             fruit.update_lifespan()
             fruit.set_position()
-            fruit_position = fruit.get_position()
+            gameboard.add_item_on_board([fruit.get_position()], CellType.FRUIT)
+            snake.append_tail()
 
-        snake.move(snake.direction)
         for event in pygame.event.get():
 
             if event.type == pygame.QUIT:
                 running = False
 
             if event.type == pygame.KEYDOWN:
+                print(event.key)
                 if event.key == pygame.K_LEFT:
                     snake.set_direction(Direction.LEFT)
                 elif event.key == pygame.K_RIGHT:
@@ -167,12 +206,28 @@ def main():
                 elif event.key == pygame.K_UP:
                     snake.set_direction(Direction.UP)
 
-        print(f'Snake: {snake.body}')
-        print(f'Fruit: {fruit_position}')
-        print(f'Score: {score}')
+        snake.move(snake.direction)
 
-        time.sleep(1)
+        if snake_head == snake.body[0]:
+            print("Game is over")
+            break
+
+        gameboard.add_item_on_board(snake.body, CellType.SNAKE)
+        gameboard.add_item_on_board([fruit.get_position()], CellType.FRUIT)
+
+        for i, row in enumerate(gameboard.board):
+            stdscr.addstr(i, 0, " ".join(list(map(str, row))))
+
+        ln_board = len(gameboard.board)
+
+        stdscr.addstr(ln_board, 0, "Data ---------------")
+        stdscr.addstr(ln_board + 1, 0, f"Score: {score}")
+        stdscr.refresh()
+
+        gameboard.clear_board()
+
+        time.sleep(0.5)
     pygame.quit()
 
 
-main()
+curses.wrapper(main)
