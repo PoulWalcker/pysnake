@@ -3,7 +3,6 @@ import random
 import pygame
 import enum
 import time
-import curses
 from typing import List
 
 BG = (148, 148, 148)
@@ -13,7 +12,7 @@ BLUE = (77, 115, 232)
 BLACK = (0, 0, 0)
 GRAY = (140, 140, 140)
 
-WIDTH, HEIGHT = 400, 400
+WIDTH, HEIGHT = 300, 300
 ROW, COL = 15, 15
 LINE_THICKNESS = 2
 CELL_SIZE = WIDTH // ROW
@@ -186,7 +185,7 @@ def draw_pixel(win, color, x, y, width, height):
 def draw_items(win, items, color, width, height):
     for coordinate in items:
         x, y = coordinate
-        draw_pixel(win, color, x * width, y * height, width, height)
+        draw_pixel(win, color, x * width + LINE_THICKNESS, y * height + LINE_THICKNESS, width - LINE_THICKNESS, height - LINE_THICKNESS)
 
 
 def main(win):
